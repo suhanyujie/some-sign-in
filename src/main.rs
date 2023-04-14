@@ -1,6 +1,8 @@
 use anyhow::{Result as AnyResult, Ok};
 use reqwest::{header::{HeaderMap, self}};
 use serde::{Deserialize, Serialize};
+#[macro_use]
+use delay_timer::prelude::*;
 
 /// 启动一个定时任务服务
 /// 每天执行签到请求 todo
@@ -77,12 +79,35 @@ fn read_config() ->AnyResult<Config>{
 
 #[tokio::main]
 async fn main() {
-    match req_sign_in().await {
-        std::result::Result::Ok(()) =>{
-            println!("ok...");
-        },
-        std::result::Result::Err(err) =>{
-            eprintln!("error: {:#?}", err);
-        }
-    }
+    exec_interval();
+}
+
+fn exec_interval() -> AnyResult<()> {
+    let deplay_timer = DelayTimerBuilder::default().build();
+    let task_instance_chain = deplay_timer.insert_task(build_task()?)?;
+    let task_instance = task_instance_chain.next_with_wait()?;
+    // task_instance.cancel_with_wait_timeout()?;
+    std::thread::park();
+    Ok(())
+}
+
+fn build_task() -> AnyResult<Task, TaskError> {
+    let expr = "0 08 23 * * *";
+    let mut task_builder = TaskBuilder::default();
+    let body = ||async{
+        println!("task exec start...");
+        match req_sign_in().await {
+            std::result::Result::Ok(()) =>{
+                println!("ok...");
+            },
+            std::result::Result::Err(err) =>{
+                eprintln!("error: {:#?}", err);
+            }
+        };
+        println!("task exec end...");
+    };
+    task_builder.set_frequency_repeated_by_cron_str(expr)
+    .set_task_id(1)
+    .set_maximum_running_time(20)
+    .spawn_async_routine(body)
 }
