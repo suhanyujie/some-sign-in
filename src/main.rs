@@ -92,7 +92,7 @@ fn exec_interval() -> AnyResult<()> {
 }
 
 fn build_task() -> AnyResult<Task, TaskError> {
-    let expr = "0 08 23 * * *";
+    let expr = "0 00 23 * * *";
     let mut task_builder = TaskBuilder::default();
     let body = ||async{
         println!("task exec start...");
