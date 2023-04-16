@@ -1,12 +1,24 @@
-use anyhow::{Result as AnyResult, Ok};
-use reqwest::{header::{HeaderMap, self}};
+use anyhow::{Ok, Result as AnyResult};
+use reqwest::header::{self, HeaderMap};
 use serde::{Deserialize, Serialize};
 #[macro_use]
 use delay_timer::prelude::*;
+#[macro_use]
+extern crate lazy_static;
+
+lazy_static! {
+    static ref GLOBAL_CONFIG: Config = {
+        match read_config() {
+            std::result::Result::Ok(config_obj) => config_obj,
+            _ => {
+                panic!("read config err")
+            }
+        }
+    };
+}
 
 /// 启动一个定时任务服务
 /// 每天执行签到请求 todo
-
 
 #[derive(Debug, Deserialize, Serialize)]
 struct BaseResp {
@@ -27,29 +39,35 @@ struct DailySignInfo {
     user_id: i32,
 }
 
-async fn req_sign_in() ->AnyResult<()> {
+async fn req_sign_in() -> AnyResult<()> {
     let config = read_config()?;
     let sign_url = config.sys.sign_url;
     let client = reqwest::Client::new();
     let resp = client
-    .post(sign_url)
-    .header(header::COOKIE, config.user.cookie)
-    .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-    .body(config.user.sign_req_body)
-    .send()
-    .await?
-    .text()
-    .await?;
+        .post(sign_url)
+        .header(header::COOKIE, config.user.cookie)
+        .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
+        .body(config.user.sign_req_body)
+        .send()
+        .await?
+        .text()
+        .await?;
     let res_obj: Result<BaseResp, serde_json::Error> = serde_json::from_str(resp.as_str());
     println!("{:?}", res_obj);
     Ok(())
 }
 
-async fn post(url: &str) ->AnyResult<String> {
+async fn post(url: &str) -> AnyResult<String> {
     let client = reqwest::Client::new();
     let mut headers = HeaderMap::new();
     headers.insert("Content-Type", "application/json".parse().unwrap());
-    let resp = client.post(url).headers(headers).send().await?.bytes().await?;
+    let resp = client
+        .post(url)
+        .headers(headers)
+        .send()
+        .await?
+        .bytes()
+        .await?;
     let resp_str = String::from_utf8_lossy(&resp);
     Ok(resp_str.to_string())
 }
@@ -69,9 +87,10 @@ struct ConfigUser {
 #[derive(Debug, Deserialize, Serialize)]
 struct ConfigSys {
     sign_url: String,
+    cron_expr: String,
 }
 
-fn read_config() ->AnyResult<Config>{
+fn read_config() -> AnyResult<Config> {
     let data = std::fs::read_to_string("./env.local.toml")?;
     let obj: Config = toml::from_str(&data)?;
     Ok(obj)
@@ -92,22 +111,23 @@ fn exec_interval() -> AnyResult<()> {
 }
 
 fn build_task() -> AnyResult<Task, TaskError> {
-    let expr = "0 00 23 * * *";
+    let expr = &GLOBAL_CONFIG.sys.cron_expr;
     let mut task_builder = TaskBuilder::default();
-    let body = ||async{
+    let body = || async {
         println!("task exec start...");
         match req_sign_in().await {
-            std::result::Result::Ok(()) =>{
+            std::result::Result::Ok(()) => {
                 println!("ok...");
-            },
-            std::result::Result::Err(err) =>{
+            }
+            std::result::Result::Err(err) => {
                 eprintln!("error: {:#?}", err);
             }
         };
         println!("task exec end...");
     };
-    task_builder.set_frequency_repeated_by_cron_str(expr)
-    .set_task_id(1)
-    .set_maximum_running_time(20)
-    .spawn_async_routine(body)
+    task_builder
+        .set_frequency_repeated_by_cron_str(expr)
+        .set_task_id(1)
+        .set_maximum_running_time(20)
+        .spawn_async_routine(body)
 }

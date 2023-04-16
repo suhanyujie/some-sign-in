@@ -1338,6 +1338,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "delay_timer",
+ "lazy_static",
  "reqwest",
  "serde",
  "serde_json",
