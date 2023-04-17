@@ -53,7 +53,11 @@ async fn req_sign_in() -> AnyResult<()> {
         .text()
         .await?;
     let res_obj: Result<BaseResp, serde_json::Error> = serde_json::from_str(resp.as_str());
-    println!("{:?}", res_obj);
+    if res_obj.is_ok() {
+        println!("sign info list len {:?}", res_obj.unwrap().list.unwrap().len());
+    } else {
+        eprintln!("sign err {:?}", res_obj.err());
+    }
     Ok(())
 }
 
