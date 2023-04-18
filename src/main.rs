@@ -102,14 +102,13 @@ fn read_config() -> AnyResult<Config> {
 
 #[tokio::main]
 async fn main() {
+    println!("start exec cycle...");
     exec_interval();
 }
 
 fn exec_interval() -> AnyResult<()> {
     let deplay_timer = DelayTimerBuilder::default().build();
-    let task_instance_chain = deplay_timer.insert_task(build_task()?)?;
-    let task_instance = task_instance_chain.next_with_wait()?;
-    // task_instance.cancel_with_wait_timeout()?;
+    let _ = deplay_timer.insert_task(build_task()?)?;
     std::thread::park();
     Ok(())
 }
