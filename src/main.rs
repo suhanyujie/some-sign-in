@@ -18,7 +18,7 @@ lazy_static! {
 }
 
 /// 启动一个定时任务服务
-/// 每天执行签到请求 todo
+/// 每天执行签到请求
 
 #[derive(Debug, Deserialize, Serialize)]
 struct BaseResp {
