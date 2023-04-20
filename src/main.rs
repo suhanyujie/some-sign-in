@@ -1,4 +1,7 @@
+use core::time;
+
 use anyhow::{Ok, Result as AnyResult};
+use rand::Rng;
 use reqwest::header::{self, HeaderMap};
 use serde::{Deserialize, Serialize};
 #[macro_use]
@@ -117,7 +120,9 @@ fn build_task() -> AnyResult<Task, TaskError> {
     let expr = &GLOBAL_CONFIG.sys.cron_expr;
     let mut task_builder = TaskBuilder::default();
     let body = || async {
-        println!("task exec start...");
+        let sleep_sec = rand::thread_rng().gen_range(0..50);
+        std::thread::sleep(time::Duration::from_secs(sleep_sec));
+        println!("开始签到...");
         match req_sign_in().await {
             std::result::Result::Ok(()) => {
                 println!("ok...");
@@ -126,7 +131,7 @@ fn build_task() -> AnyResult<Task, TaskError> {
                 eprintln!("error: {:#?}", err);
             }
         };
-        println!("task exec end...");
+        println!("签到完成...");
     };
     task_builder
         .set_frequency_repeated_by_cron_str(expr)
