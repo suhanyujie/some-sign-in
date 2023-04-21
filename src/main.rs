@@ -1,38 +1,19 @@
-use core::time;
-
 use anyhow::{Ok, Result as AnyResult};
-use rand::Rng;
-use reqwest::header::{self, HeaderMap};
-use serde::{Deserialize, Serialize};
-#[macro_use]
+use core::time;
 use delay_timer::prelude::*;
+use rand::Rng;
 #[macro_use]
 extern crate lazy_static;
 
-mod sites;
 mod conf;
+mod sites;
 
 /// 启动一个定时任务服务
 /// 每天执行签到请求
 
-async fn post(url: &str) -> AnyResult<String> {
-    let client = reqwest::Client::new();
-    let mut headers = HeaderMap::new();
-    headers.insert("Content-Type", "application/json".parse().unwrap());
-    let resp = client
-        .post(url)
-        .headers(headers)
-        .send()
-        .await?
-        .bytes()
-        .await?;
-    let resp_str = String::from_utf8_lossy(&resp);
-    Ok(resp_str.to_string())
-}
-
 #[tokio::main]
 async fn main() {
-    println!("start exec cycle...");
+    println!("定时任务已启动，到达特定时间点后会进行签到，请不要关闭窗口...");
     exec_interval();
 }
 
@@ -47,18 +28,35 @@ fn build_task() -> AnyResult<Task, TaskError> {
     let expr = &conf::conf::GLOBAL_CONFIG.sys.cron_expr;
     let mut task_builder = TaskBuilder::default();
     let body = || async {
-        let sleep_sec = rand::thread_rng().gen_range(0..50);
+        let sleep_sec = rand::thread_rng().gen_range(0..15);
         std::thread::sleep(time::Duration::from_secs(sleep_sec));
-        println!("开始签到...");
         match sites::normal::req_sign_in().await {
-            std::result::Result::Ok(()) => {
-                println!("ok...");
+            std::result::Result::Ok(_) => {
+                println!("glados 签到完成 ok...");
             }
             std::result::Result::Err(err) => {
-                eprintln!("error: {:#?}", err);
+                eprintln!("glados 签到失败 error: {:#?}", err);
             }
-        };
-        println!("签到完成...");
+        }
+        // 其他签到 todo
+        let sign_list = &conf::conf::GLOBAL_CONFIG.user.sign_list;
+        for item in sign_list {
+            if item.site_name.is_empty() {
+                continue;
+            }
+            let res = sites::normal::post(&item.url, &item.cookie, &item.req_body).await;
+            println!("------------- {} 签到：-----------------", item.site_name);
+            match res {
+                std::result::Result::Ok(v) => {
+                    println!("{}", &v.err_msg)
+                }
+                Err(err) => {
+                    eprintln!("{}", err)
+                }
+            }
+            println!("------------------------------")
+        }
+        println!("本次签到任务完成，等待下次任务时间...")
     };
     task_builder
         .set_frequency_repeated_by_cron_str(expr)

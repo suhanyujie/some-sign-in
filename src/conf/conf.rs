@@ -5,8 +5,8 @@ lazy_static! {
     pub static ref GLOBAL_CONFIG: Config = {
         match read_config() {
             std::result::Result::Ok(config_obj) => config_obj,
-            _ => {
-                panic!("read config err")
+            Err(err) => {
+                panic!("read config err: {}", err)
             }
         }
     };
@@ -22,6 +22,16 @@ pub struct Config {
 pub struct ConfigUser {
     pub cookie: String,
     pub sign_req_body: String,
+    pub sign_list: Vec<OneSiteSign>
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct OneSiteSign {
+    pub site_name: String, 
+    pub url: String,
+    pub req_query_param: String,
+    pub cookie: String,
+    pub req_body: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -35,3 +45,5 @@ pub fn read_config() -> AnyResult<Config> {
     let obj: Config = toml::from_str(&data)?;
     Ok(obj)
 }
+
+

@@ -1,1 +1,1 @@
-pub mod conf;
+pub(crate) mod conf;
