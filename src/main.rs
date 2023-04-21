@@ -9,60 +9,11 @@ use delay_timer::prelude::*;
 #[macro_use]
 extern crate lazy_static;
 
-lazy_static! {
-    static ref GLOBAL_CONFIG: Config = {
-        match read_config() {
-            std::result::Result::Ok(config_obj) => config_obj,
-            _ => {
-                panic!("read config err")
-            }
-        }
-    };
-}
+mod sites;
+mod conf;
 
 /// 启动一个定时任务服务
 /// 每天执行签到请求
-
-#[derive(Debug, Deserialize, Serialize)]
-struct BaseResp {
-    code: i32,
-    message: String,
-    list: Option<Vec<DailySignInfo>>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct DailySignInfo {
-    asset: String,
-    balance: String,
-    business: String,
-    change: String,
-    detail: String,
-    id: i32,
-    time: i64,
-    user_id: i32,
-}
-
-async fn req_sign_in() -> AnyResult<()> {
-    let config = read_config()?;
-    let sign_url = config.sys.sign_url;
-    let client = reqwest::Client::new();
-    let resp = client
-        .post(sign_url)
-        .header(header::COOKIE, config.user.cookie)
-        .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .body(config.user.sign_req_body)
-        .send()
-        .await?
-        .text()
-        .await?;
-    let res_obj: Result<BaseResp, serde_json::Error> = serde_json::from_str(resp.as_str());
-    if res_obj.is_ok() {
-        println!("sign info list len {:?}", res_obj.unwrap().list.unwrap().len());
-    } else {
-        eprintln!("sign err {:?}", res_obj.err());
-    }
-    Ok(())
-}
 
 async fn post(url: &str) -> AnyResult<String> {
     let client = reqwest::Client::new();
@@ -79,30 +30,6 @@ async fn post(url: &str) -> AnyResult<String> {
     Ok(resp_str.to_string())
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Config {
-    user: ConfigUser,
-    sys: ConfigSys,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct ConfigUser {
-    cookie: String,
-    sign_req_body: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct ConfigSys {
-    sign_url: String,
-    cron_expr: String,
-}
-
-fn read_config() -> AnyResult<Config> {
-    let data = std::fs::read_to_string("./env.local.toml")?;
-    let obj: Config = toml::from_str(&data)?;
-    Ok(obj)
-}
-
 #[tokio::main]
 async fn main() {
     println!("start exec cycle...");
@@ -117,13 +44,13 @@ fn exec_interval() -> AnyResult<()> {
 }
 
 fn build_task() -> AnyResult<Task, TaskError> {
-    let expr = &GLOBAL_CONFIG.sys.cron_expr;
+    let expr = &conf::conf::GLOBAL_CONFIG.sys.cron_expr;
     let mut task_builder = TaskBuilder::default();
     let body = || async {
         let sleep_sec = rand::thread_rng().gen_range(0..50);
         std::thread::sleep(time::Duration::from_secs(sleep_sec));
         println!("开始签到...");
-        match req_sign_in().await {
+        match sites::normal::req_sign_in().await {
             std::result::Result::Ok(()) => {
                 println!("ok...");
             }
