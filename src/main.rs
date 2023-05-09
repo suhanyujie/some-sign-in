@@ -51,17 +51,16 @@ fn build_task() -> AnyResult<Task, TaskError> {
                 if item.site_name.is_empty() {
                     continue;
                 }
-                let res = sites::normal::post(&item.url, &item.cookie, &item.req_body).await;
                 println!("------------- {} 签到：-----------------", item.site_name);
+                let res = sites::normal::post(&item.url, &item.cookie, &item.req_body).await;
                 match res {
                     std::result::Result::Ok(v) => {
-                        println!("成功！{}", &v)
+                        println!("成功！{:#?}", &v)
                     }
                     Err(err) => {
-                        eprintln!("失败！{}", err)
+                        eprintln!("失败！{:#?}", err)
                     }
                 }
-                println!("------------------------------");
                 suc_num += 1;
             }
         }
