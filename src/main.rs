@@ -1,7 +1,10 @@
 use anyhow::{Ok, Result as AnyResult};
+use chrono::{DateTime, FixedOffset, Local, Utc};
 use core::time;
 use delay_timer::prelude::*;
 use rand::Rng;
+
+use crate::conf::conf::OneSiteSign;
 #[macro_use]
 extern crate lazy_static;
 
@@ -28,35 +31,41 @@ fn build_task() -> AnyResult<Task, TaskError> {
     let expr = &conf::conf::GLOBAL_CONFIG.sys.cron_expr;
     let mut task_builder = TaskBuilder::default();
     let body = || async {
+        let local_time = Local::now();
+        let utc_time = DateTime::<Utc>::from_utc(local_time.naive_utc(), Utc);
+        let china_timezone = FixedOffset::east_opt(8 * 3600).unwrap();
+        println!(
+            "------------- 新一轮签到 {} -------------",
+            utc_time.with_timezone(&china_timezone)
+        );
+
         let sleep_sec = rand::thread_rng().gen_range(0..15);
         std::thread::sleep(time::Duration::from_secs(sleep_sec));
-        match sites::normal::req_sign_in().await {
-            std::result::Result::Ok(_) => {
-                println!("glados 签到完成 ok...");
-            }
-            std::result::Result::Err(err) => {
-                eprintln!("glados 签到失败 error: {:#?}", err);
-            }
-        }
-        // 其他签到 todo
+
         let sign_list = &conf::conf::GLOBAL_CONFIG.user.sign_list;
-        for item in sign_list {
-            if item.site_name.is_empty() {
-                continue;
-            }
-            let res = sites::normal::post(&item.url, &item.cookie, &item.req_body).await;
-            println!("------------- {} 签到：-----------------", item.site_name);
-            match res {
-                std::result::Result::Ok(v) => {
-                    println!("{}", &v.err_msg)
+        let mut suc_num = 0;
+
+        if sign_list.is_some() {
+            let sign_list_ref = sign_list.as_ref().unwrap();
+            for item in sign_list_ref {
+                if item.site_name.is_empty() {
+                    continue;
                 }
-                Err(err) => {
-                    eprintln!("{}", err)
+                let res = sites::normal::post(&item.url, &item.cookie, &item.req_body).await;
+                println!("------------- {} 签到：-----------------", item.site_name);
+                match res {
+                    std::result::Result::Ok(v) => {
+                        println!("成功！{}", &v)
+                    }
+                    Err(err) => {
+                        eprintln!("失败！{}", err)
+                    }
                 }
+                println!("------------------------------");
+                suc_num += 1;
             }
-            println!("------------------------------")
         }
-        println!("本次签到任务完成，等待下次任务时间...")
+        println!("本次签到任务完成 {} 个，等待下次任务时间...", suc_num);
     };
     task_builder
         .set_frequency_repeated_by_cron_str(expr)

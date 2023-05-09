@@ -1,6 +1,6 @@
+use crate::conf::conf;
 use anyhow::{Ok, Result as AnyResult};
 use reqwest::header::{self};
-use crate::conf::conf;
 use serde::{Deserialize, Serialize};
 
 /// glodos 签到
@@ -37,11 +37,11 @@ pub async fn req_sign_in() -> AnyResult<()> {
         .text()
         .await?;
     let res_obj: Result<SignOfGladosResp, serde_json::Error> = serde_json::from_str(resp.as_str());
-    
+
     // println!("{:#?}", res_obj);
     if res_obj.is_err() {
         eprintln!("sign err {:?}", res_obj.err());
-    } 
+    }
     Ok(())
 }
 
@@ -52,7 +52,12 @@ pub(crate) struct SignOfJueJinResp {
 }
 
 /// 签到发送 post 请求
-pub(crate) async fn post<'a: 'static>(sign_url: &'a str, cookie: &'a str, req_body: &'a str) -> AnyResult<SignOfJueJinResp> {
+pub(crate) async fn post<'a: 'static>(
+    sign_url: &'a str,
+    cookie: &'a str,
+    req_body: &'a str,
+) -> AnyResult<serde_json::Value> {
+    // SignOfJueJinResp
     let client = reqwest::Client::new();
     let resp = client
         .post(sign_url)
@@ -63,12 +68,14 @@ pub(crate) async fn post<'a: 'static>(sign_url: &'a str, cookie: &'a str, req_bo
         .await?
         .text()
         .await?;
-    let res_obj: Result<SignOfJueJinResp, serde_json::Error> = serde_json::from_str(resp.as_str());
-    println!("resp:{}", resp.as_str());
-    match res_obj {
-        std::result::Result::Ok(v) => Ok(v),
-        Err(err) => Err(anyhow::anyhow!(err)),
-    }
+    // let res_obj: Result<RESP, serde_json::Error> = serde_json::from_str(resp.as_str());
+    // match res_obj {
+    //     std::result::Result::Ok(v) => Ok(v),
+    //     Err(err) => Err(anyhow::anyhow!(err)),
+    // }
+    let res_obj: serde_json::Value = serde_json::from_str(resp.as_str())?;
+    println!("resp:{:#?}", res_obj.as_str());
+    Ok(res_obj)
 }
 
 #[cfg(test)]

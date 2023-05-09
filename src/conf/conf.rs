@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use anyhow::{Ok, Result as AnyResult};
+use serde::{Deserialize, Serialize};
 
 lazy_static! {
     pub static ref GLOBAL_CONFIG: Config = {
@@ -22,12 +22,12 @@ pub struct Config {
 pub struct ConfigUser {
     pub cookie: String,
     pub sign_req_body: String,
-    pub sign_list: Vec<OneSiteSign>
+    pub sign_list: Option<Vec<OneSiteSign>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct OneSiteSign {
-    pub site_name: String, 
+    pub site_name: String,
     pub url: String,
     pub req_query_param: String,
     pub cookie: String,
@@ -45,5 +45,3 @@ pub fn read_config() -> AnyResult<Config> {
     let obj: Config = toml::from_str(&data)?;
     Ok(obj)
 }
-
-
