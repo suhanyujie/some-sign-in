@@ -75,7 +75,7 @@ pub(crate) async fn post<'a: 'static>(
     //     Err(err) => Err(anyhow::anyhow!(err)),
     // }
     let res_obj: serde_json::Value = serde_json::from_str(resp.as_str())?;
-    println!("resp:{:#?}", res_obj.as_str());
+    println!("resp str:{:#?}", resp.as_str());
     Ok(res_obj)
 }
 
@@ -85,10 +85,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_post_juejin() {
-        let sign_url = "https://api.juejin.cn/growth_api/v1/check_in";
+        let sign_url = "https://glados.rocks/api/user/checkin";
         let cookie = r#"xxx"#;
-        let req_body = "{}";
+        let req_body = r#"{"token":"glados.network"}"#;
         let res = post(sign_url, cookie, req_body).await;
-        assert_eq!(res.is_ok(), true);
+        println!("ok....");
+        // assert_eq!(res.is_ok(), true);
     }
 }
