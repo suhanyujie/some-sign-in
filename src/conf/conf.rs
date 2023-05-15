@@ -20,8 +20,8 @@ pub struct Config {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ConfigUser {
-    pub cookie: String,
-    pub sign_req_body: String,
+    // pub cookie: String,
+    // pub sign_req_body: String,
     pub sign_list: Option<Vec<OneSiteSign>>,
 }
 

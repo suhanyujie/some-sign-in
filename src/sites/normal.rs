@@ -23,27 +23,27 @@ struct DailySignInfo {
     user_id: i32,
 }
 
-pub async fn req_sign_in() -> AnyResult<()> {
-    let config = conf::read_config()?;
-    let sign_url = config.sys.sign_url;
-    let client = reqwest::Client::new();
-    let resp = client
-        .post(sign_url)
-        .header(header::COOKIE, config.user.cookie)
-        .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .body(config.user.sign_req_body)
-        .send()
-        .await?
-        .text()
-        .await?;
-    let res_obj: Result<SignOfGladosResp, serde_json::Error> = serde_json::from_str(resp.as_str());
+/// 旧版
+// pub async fn req_sign_in() -> AnyResult<()> {
+//     let config = conf::read_config()?;
+//     let sign_url = config.sys.sign_url;
+//     let client = reqwest::Client::new();
+//     let resp = client
+//         .post(sign_url)
+//         .header(header::COOKIE, config.user.cookie)
+//         .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
+//         .body(config.user.sign_req_body)
+//         .send()
+//         .await?
+//         .text()
+//         .await?;
+//     let res_obj: Result<SignOfGladosResp, serde_json::Error> = serde_json::from_str(resp.as_str());
 
-    // println!("{:#?}", res_obj);
-    if res_obj.is_err() {
-        eprintln!("sign err {:?}", res_obj.err());
-    }
-    Ok(())
-}
+//     if res_obj.is_err() {
+//         eprintln!("sign err {:?}", res_obj.err());
+//     }
+//     Ok(())
+// }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct SignOfJueJinResp {
