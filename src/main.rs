@@ -1,111 +1,22 @@
-use core::time;
-
 use anyhow::{Ok, Result as AnyResult};
-use rand::Rng;
-use reqwest::header::{self, HeaderMap};
-use serde::{Deserialize, Serialize};
-#[macro_use]
+use chrono::{DateTime, FixedOffset, Local, Utc};
+use core::time;
 use delay_timer::prelude::*;
+use rand::Rng;
+
+use crate::conf::conf::OneSiteSign;
 #[macro_use]
 extern crate lazy_static;
 
-lazy_static! {
-    static ref GLOBAL_CONFIG: Config = {
-        match read_config() {
-            std::result::Result::Ok(config_obj) => config_obj,
-            _ => {
-                panic!("read config err")
-            }
-        }
-    };
-}
+mod conf;
+mod sites;
 
 /// 启动一个定时任务服务
 /// 每天执行签到请求
 
-#[derive(Debug, Deserialize, Serialize)]
-struct BaseResp {
-    code: i32,
-    message: String,
-    list: Option<Vec<DailySignInfo>>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct DailySignInfo {
-    asset: String,
-    balance: String,
-    business: String,
-    change: String,
-    detail: String,
-    id: i32,
-    time: i64,
-    user_id: i32,
-}
-
-async fn req_sign_in() -> AnyResult<()> {
-    let config = read_config()?;
-    let sign_url = config.sys.sign_url;
-    let client = reqwest::Client::new();
-    let resp = client
-        .post(sign_url)
-        .header(header::COOKIE, config.user.cookie)
-        .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
-        .body(config.user.sign_req_body)
-        .send()
-        .await?
-        .text()
-        .await?;
-    let res_obj: Result<BaseResp, serde_json::Error> = serde_json::from_str(resp.as_str());
-    if res_obj.is_ok() {
-        println!("sign info list len {:?}", res_obj.unwrap().list.unwrap().len());
-    } else {
-        eprintln!("sign err {:?}", res_obj.err());
-    }
-    Ok(())
-}
-
-async fn post(url: &str) -> AnyResult<String> {
-    let client = reqwest::Client::new();
-    let mut headers = HeaderMap::new();
-    headers.insert("Content-Type", "application/json".parse().unwrap());
-    let resp = client
-        .post(url)
-        .headers(headers)
-        .send()
-        .await?
-        .bytes()
-        .await?;
-    let resp_str = String::from_utf8_lossy(&resp);
-    Ok(resp_str.to_string())
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct Config {
-    user: ConfigUser,
-    sys: ConfigSys,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct ConfigUser {
-    cookie: String,
-    sign_req_body: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct ConfigSys {
-    sign_url: String,
-    cron_expr: String,
-}
-
-fn read_config() -> AnyResult<Config> {
-    let data = std::fs::read_to_string("./env.local.toml")?;
-    let obj: Config = toml::from_str(&data)?;
-    Ok(obj)
-}
-
 #[tokio::main]
 async fn main() {
-    println!("start exec cycle...");
+    println!("定时任务已启动，到达特定时间点后会进行签到，请不要关闭窗口...");
     exec_interval();
 }
 
@@ -117,21 +28,43 @@ fn exec_interval() -> AnyResult<()> {
 }
 
 fn build_task() -> AnyResult<Task, TaskError> {
-    let expr = &GLOBAL_CONFIG.sys.cron_expr;
+    let expr = &conf::conf::GLOBAL_CONFIG.sys.cron_expr;
     let mut task_builder = TaskBuilder::default();
     let body = || async {
-        let sleep_sec = rand::thread_rng().gen_range(0..50);
+        let local_time = Local::now();
+        let utc_time = DateTime::<Utc>::from_utc(local_time.naive_utc(), Utc);
+        let china_timezone = FixedOffset::east_opt(8 * 3600).unwrap();
+        println!(
+            "------------- 新一轮签到 {} -------------",
+            utc_time.with_timezone(&china_timezone)
+        );
+
+        let sleep_sec = rand::thread_rng().gen_range(0..15);
         std::thread::sleep(time::Duration::from_secs(sleep_sec));
-        println!("开始签到...");
-        match req_sign_in().await {
-            std::result::Result::Ok(()) => {
-                println!("ok...");
+
+        let sign_list = &conf::conf::GLOBAL_CONFIG.user.sign_list;
+        let mut suc_num = 0;
+
+        if sign_list.is_some() {
+            let sign_list_ref = sign_list.as_ref().unwrap();
+            for item in sign_list_ref {
+                if item.site_name.is_empty() {
+                    continue;
+                }
+                println!("------------- {} 签到：-----------------", item.site_name);
+                let res = sites::normal::post(&item.url, &item.cookie, &item.req_body).await;
+                match res {
+                    std::result::Result::Ok(v) => {
+                        println!("成功！{:#?}", &v)
+                    }
+                    Err(err) => {
+                        eprintln!("失败！{:#?}", err)
+                    }
+                }
+                suc_num += 1;
             }
-            std::result::Result::Err(err) => {
-                eprintln!("error: {:#?}", err);
-            }
-        };
-        println!("签到完成...");
+        }
+        println!("本次签到任务完成 {} 个，等待下次任务时间...", suc_num);
     };
     task_builder
         .set_frequency_repeated_by_cron_str(expr)
